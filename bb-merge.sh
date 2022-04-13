@@ -3,23 +3,25 @@
 WORKSPACE=
 REPO=
 PR_ID=
+USER=
 COMMITS=all
 
 function usage() {
 echo "
-Usage: $0 -w <workspace> -r <repo> [?-c (all|first)] <pr number>
+Usage: $0 -u <user> -w <workspace> -r <repo> [?-c (all|first)] <pr number>
 
 e.g.
 
-$0 -w my_workspace -r my_repo 64
-$0 -w my_workspace -r my_repo -c first 64
+$0 -u jtroo -w my_workspace -r my_repo 64
+$0 -u jtroo -w my_workspace -r my_repo -c first 64
 
 Flags:
 
-  -h | --help      : Print this message
-  -w | --workspace : Bitbucket workspace
-  -r | --repo      : Bitbucket repository
   -c | --commits   : Commits to include in message (all|first) (default: all)
+  -h | --help      : Print this message
+  -r | --repo      : Bitbucket repository
+  -u | --user      : Bitbucket user
+  -w | --workspace : Bitbucket workspace
 "
 }
 
@@ -28,6 +30,10 @@ while [ ! $# -eq 0 ]; do
 		-h | --help)
 			usage
 			exit 0
+			;;
+		-u | --user)
+			shift
+			USER=$1
 			;;
 		-w | --workspace)
 			shift
@@ -49,7 +55,7 @@ while [ ! $# -eq 0 ]; do
 	shift
 done
 
-if [ -z "$WORKSPACE" ] || [ -z "$REPO" ] || [ -z "$PR_ID" ]; then
+if [ -z "$WORKSPACE" ] || [ -z "$REPO" ] || [ -z "$PR_ID" ] || [ -z "$USER" ]; then
 	usage
 	exit 1
 fi
@@ -58,7 +64,7 @@ if [ "$COMMITS" != all ] && [ "$COMMITS" != first ]; then
 	exit 1
 fi
 
-source .env
+source .env >/dev/null 2>&1
 if [ -z "$BB_APP_PW" ]; then
 	echo "No Bitbucket app password set"
 	echo "App password (saved to .env file in current directory):"
@@ -77,7 +83,7 @@ echo
 # obj.participants[...].state === 'approved'
 # obj.participants[...].user.display_name
 pr=$(curl --request GET \
-	-u jtache:$BB_APP_PW \
+	-u $USER:$BB_APP_PW \
 	--url "https://api.bitbucket.org/2.0/repositories/$WORKSPACE/$REPO/pullrequests/$PR_ID" \
 	--header 'Accept: application/json')
 title=$(echo "$pr" | ./bb-obj.js pr title)
@@ -89,7 +95,7 @@ echo
 # # Care about:
 # # obj.values[...].message (order is increasing age or decreasing recency)
 commits=$(curl --request GET \
-	-u jtache:$BB_APP_PW \
+	-u $USER:$BB_APP_PW \
 	--url "https://api.bitbucket.org/2.0/repositories/$WORKSPACE/$REPO/pullrequests/$PR_ID/commits")
 
 body=$(echo "$commits" | ./bb-obj.js commits $COMMITS)
@@ -116,7 +122,7 @@ commit_message=$(
 
 set +e
 ret=$(curl --request POST \
-	-u jtache:$BB_APP_PW \
+	-u $USER:$BB_APP_PW \
 	--url "https://api.bitbucket.org/2.0/repositories/$WORKSPACE/$REPO/pullrequests/$PR_ID/merge" \
 	--header 'Content-Type: application/json' \
 	-d "{
