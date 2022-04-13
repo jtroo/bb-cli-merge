@@ -1,14 +1,18 @@
 # Bitbucket merge CLI tool
 
-This tool exists due to frustration with the default squash merge message that
-the Bitbucket (Cloud) UI makes upon merging. Especially recently, it no longer
-includes the entire commit text and truncates it with an ellipsis `...`.
+This is an opinionated tool to automate a squash merge for a Bitbucket
+pull request with a commit message that differs from the default.
+
+This tool exists due to my frustration with the default squash merge message
+that the Bitbucket UI makes upon merging. Especially recently, it no longer
+includes the entire commit text and truncates it with an ellipsis `...` if the
+commit text is too long.
 
 I want a commit from a pull request to look like this in my commit history
 after doing a squash merge:
 
 ```
-<PR title> (PR #<PR number>)
+<PR title> (PR #X)
 
 <commits text>
 
@@ -29,17 +33,17 @@ for me.
 - awk
 - gpg
 
-# How to use
+# Usage
 
 ```sh
 # help
 ./bb-merge.sh -h
 
-# print out desired commit message
+# print out commit message, do not actually do the merge
 ./bb-merge.sh -w <workspace> -r <repo> [?-c (all|first)] <pr number>
 
 # do the merge
-./bb-merge.sh -w <workspace> -r <repo> -a merge [?-c (all|first)] <pr number>
+./bb-merge.sh -w <workspace> -r <repo> [?-c (all|first)] -a merge <pr number>
 ```
 
 # Security
@@ -54,8 +58,8 @@ to check the code, there's not that much of it.
 # Commit message after merging
 
 This tool always uses the squash merge strategy. There are two ways that the
-commit message can be formatted, determed by the `-c | --commit` flag. They are
-mostly similar, with the difference being in the commit body.
+commit message can be formatted, determined by the `-c | --commit` flag. They
+are mostly similar, with the difference being in the commit body.
 
 ## Header
 
@@ -162,7 +166,8 @@ Bitbucket squash merge message.
 
 - The truncation described above is particularly grievous
 - The default header prefix `Merged in <branch>` wastes characters and relies
-  on the branch name being a useful title.
+  on the branch name being useful. Even if your branch name is useful, it's
+  ugly since you can't use whitespace in the branch name.
 - The default header suffix `(pull request #X)` also wastes characters when it
   could be shortened without losing any meaning. The `PR #X` text correctly
   hyperlinks in the Bitbucket UI at the time of writing, so there's no reason
