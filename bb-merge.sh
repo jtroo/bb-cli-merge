@@ -100,10 +100,6 @@ commits=$(curl --request GET \
 
 body=$(echo "$commits" | ./bb-obj.js commits $COMMITS)
 
-echo
-echo "Merging"
-echo
-
 # Format commit as:
 #
 #     title
@@ -113,11 +109,18 @@ echo
 #
 # Double-quotes and newlines are escaped by sed and awk because the text is
 # sent as JSON. Strips carriage returns.
+msg=$(printf "$title\n\n$body\n$footer")
+echo "Merging with message:"
+echo -----
+echo "$msg"
+echo -----
+echo
+
 commit_message=$(
-	echo "$title\n\n$body\n$footer" |
+	echo "$msg" |
 		sed 's/"/\\\"/g' |
-		awk -vRS=\0 '{gsub(/\n/,"\\n")}1' |
-		awk -vRS=\0 '{gsub(/\r/,"")}1'
+		awk -vRS='\0' '{gsub(/\n/,"\\n")}1' |
+		awk -vRS='\0' '{gsub(/\r/,"")}1'
 )
 
 set +e
@@ -130,16 +133,14 @@ ret=$(curl --request POST \
 		\"merge_strategy\":\"squash\",
 		\"close_source_branch\":true,
 		\"message\":\"$commit_message\"
-	}")
+	}"
+)
 
-status=$?
-if [ $status -ne 0 ]; then
-	echo
+echo
+if [ ${#ret} -lt 100 ]; then
 	echo $ret
-	echo
-	exit $status
+else
+	# This doen't actually check success, it just assumes that a long returned
+	# value is the large JSON that is returned when successful.
+	echo "Success"
 fi
-
-echo
-echo "Success"
-echo
