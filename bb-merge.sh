@@ -2,7 +2,7 @@
 
 WORKSPACE=jtache
 REPO=.vim
-PR_ID=2
+PR_ID=5
 
 source .env
 if [ -z "$BB_APP_PW" ]; then
@@ -41,21 +41,31 @@ title=$(echo "$pr" | ./bb-obj.js pr title)
 body=$(echo "$commits" | ./bb-obj.js commits all)
 footer=$(echo "$pr" | ./bb-obj.js pr approvers)
 
-echo
+commit_message=$(echo "$title\n\n$body\n\n$footer" | sed 's/"/\\\"/g' | awk -vRS=\0 '{gsub(/\n/,"\\n")}1')
+
+echo "Merging"
 echo
 
-echo "$title"
-echo
-echo "$body"
-echo
-echo "$footer"
+set +e
+ret=$(curl --request POST \
+	-u jtache:$BB_APP_PW \
+	--url "https://api.bitbucket.org/2.0/repositories/$WORKSPACE/$REPO/pullrequests/$PR_ID/merge" \
+	--header 'Content-Type: application/json' \
+	-d "{
+		\"type\":\"squash\",
+		\"merge_strategy\":\"squash\",
+		\"close_source_branch\":true,
+		\"message\":\"$commit_message\"
+	}")
+
+status=$?
+if [ $status -ne 0 ]; then
+	echo
+	echo $ret
+	echo
+	exit $status
+fi
 
 echo
+echo "Success"
 echo
-
-body=$(echo "$commits" | ./bb-obj.js commits first)
-echo "$title"
-echo
-echo "$body"
-echo
-echo "$footer"

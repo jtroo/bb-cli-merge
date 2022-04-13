@@ -83,6 +83,12 @@ function process_stdin(cb) {
     });
 
     process.stdin.on('end', () => {
-        cb(JSON.parse(all_stdin))
+        try {
+            cb(JSON.parse(all_stdin))
+        } catch (_) {
+            console.error('Could not parse; likely PR does not exist\n')
+            console.error(`HTTP body:\n${all_stdin}`)
+            process.exit(1)
+        }
     });
 }
