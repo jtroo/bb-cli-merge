@@ -27,6 +27,7 @@ for me.
 - curl
 - sed
 - awk
+- gpg
 
 # How to use
 
@@ -35,16 +36,17 @@ for me.
 ./bb-merge.sh -h
 
 # do a merge
-./bb-merge.sh -u <user> -w <workspace> -r <repo> [?-c (all|first)] <pr number>
+./bb-merge.sh -w <workspace> -r <repo> [?-c (all|first)] <pr number>
 ```
 
 # Security
 
 This code relies on a [Bitbucket app password](https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/)
-to be able to read from Bitbucket and perform the merge. The app password gets
-stored in plaintext into `$PWD/.env`. The app password is not sent anywhere
-other than to Bitbucket over https. Feel free to check the code, there's not
-that much of it.
+to be able to read from Bitbucket and perform the merge. When running the
+script, you will be prompted to input your Bitbucket username and app password.
+These will be encrypted and stored with `gpg` in `$PWD/.env.gpg`. Your
+credentials are not sent anywhere other than to Bitbucket over https. Feel free
+to check the code, there's not that much of it.
 
 # Commit message after merging
 

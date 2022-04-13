@@ -1,2 +1,2 @@
-# where app password is saved
-.env
+# Where Bitbucket username and app password are saved
+.env.gpg

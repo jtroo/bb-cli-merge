@@ -3,24 +3,23 @@
 WORKSPACE=
 REPO=
 PR_ID=
-USER=
+BB_USER=
 COMMITS=all
 
 function usage() {
 echo "
-Usage: $0 -u <user> -w <workspace> -r <repo> [?-c (all|first)] <pr number>
+Usage: $0 -w <workspace> -r <repo> [?-c (all|first)] <pr number>
 
 e.g.
 
-$0 -u jtroo -w my_workspace -r my_repo 64
-$0 -u jtroo -w my_workspace -r my_repo -c first 64
+$0 -w my_workspace -r my_repo 64
+$0 -w my_workspace -r my_repo -c first 64
 
 Flags:
 
   -c | --commits   : Commits to include in message (all|first) (default: all)
   -h | --help      : Print this message
   -r | --repo      : Bitbucket repository
-  -u | --user      : Bitbucket user
   -w | --workspace : Bitbucket workspace
 "
 }
@@ -30,10 +29,6 @@ while [ ! $# -eq 0 ]; do
 		-h | --help)
 			usage
 			exit 0
-			;;
-		-u | --user)
-			shift
-			USER=$1
 			;;
 		-w | --workspace)
 			shift
@@ -55,7 +50,7 @@ while [ ! $# -eq 0 ]; do
 	shift
 done
 
-if [ -z "$WORKSPACE" ] || [ -z "$REPO" ] || [ -z "$PR_ID" ] || [ -z "$USER" ]; then
+if [ -z "$WORKSPACE" ] || [ -z "$REPO" ] || [ -z "$PR_ID" ]; then
 	usage
 	exit 1
 fi
@@ -64,14 +59,29 @@ if [ "$COMMITS" != all ] && [ "$COMMITS" != first ]; then
 	exit 1
 fi
 
-source .env >/dev/null 2>&1
-if [ -z "$BB_APP_PW" ]; then
-	echo "No Bitbucket app password set"
-	echo "App password (saved to .env file in current directory):"
-	read -p "> " BB_APP_PW
-	echo "export BB_APP_PW=$BB_APP_PW" > .env
+# Ensure temporary .env file is removed
+function cleanup {
+        rm -f .env
+}
+trap cleanup EXIT
+
+# Read in username and app pass if they exist. The should be stored as `export
+# <var>=<value>` strings which are directly runnable, hence running gpg in a
+# freestanding $(...).
+$(2>/dev/null gpg -d .env.gpg)
+
+if [ -z "$BB_APP_PW" ] || [ -z "$BB_USER" ]; then
+	echo "Input username (saved to .env.gpg file in current directory):"
+	read -p "> " BB_USER
+	echo "export BB_USER=$BB_USER" > .env
+	echo "Input app password (saved to .env.gpg file in current directory):"
+	read -sp "(characters are hidden) > " BB_APP_PW
+	echo "export BB_APP_PW=$BB_APP_PW" >> .env
+	gpg -c .env
+	rm .env
 fi
 
+# Commands should not fail from here on.
 set -euo pipefail
 
 echo
@@ -83,7 +93,7 @@ echo
 # obj.participants[...].state === 'approved'
 # obj.participants[...].user.display_name
 pr=$(curl --request GET \
-	-u $USER:$BB_APP_PW \
+	-u $BB_USER:$BB_APP_PW \
 	--url "https://api.bitbucket.org/2.0/repositories/$WORKSPACE/$REPO/pullrequests/$PR_ID" \
 	--header 'Accept: application/json')
 title=$(echo "$pr" | ./bb-obj.js pr title)
@@ -95,9 +105,8 @@ echo
 # # Care about:
 # # obj.values[...].message (order is increasing age or decreasing recency)
 commits=$(curl --request GET \
-	-u $USER:$BB_APP_PW \
+	-u $BB_USER:$BB_APP_PW \
 	--url "https://api.bitbucket.org/2.0/repositories/$WORKSPACE/$REPO/pullrequests/$PR_ID/commits")
-
 body=$(echo "$commits" | ./bb-obj.js commits $COMMITS)
 
 # Format commit as:
@@ -125,7 +134,7 @@ commit_message=$(
 
 set +e
 ret=$(curl --request POST \
-	-u $USER:$BB_APP_PW \
+	-u $BB_USER:$BB_APP_PW \
 	--url "https://api.bitbucket.org/2.0/repositories/$WORKSPACE/$REPO/pullrequests/$PR_ID/merge" \
 	--header 'Content-Type: application/json' \
 	-d "{
@@ -140,7 +149,9 @@ echo
 if [ ${#ret} -lt 100 ]; then
 	echo $ret
 else
-	# This doen't actually check success, it just assumes that a long returned
-	# value is the large JSON that is returned when successful.
+	# This doen't actually check success, it just assumes that a long
+	# returned value is the large JSON that is returned when successful.
+	# I'm too lazy to figure out how to properly check for success, and
+	# this seems good enough for the script's intended use case.
 	echo "Success"
 fi
