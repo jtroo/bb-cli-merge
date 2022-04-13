@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 let args = process.argv
+console.error('')
 
 if (args.length < 3) {
     console.error('Incorrect usage')
@@ -33,6 +34,10 @@ function handle_pr() {
                 console.error('PR already merged')
                 process.exit(1)
             }
+            if (pr_obj.participants.length === 0) {
+                return
+            }
+            console.log('')
             for (let p of pr_obj.participants) {
                 if (p.state === 'approved') {
                     console.log(`Approved by: ${p.user.display_name}`)
@@ -56,7 +61,13 @@ function handle_commits() {
                 console.error('No commits - PR likely already merged')
                 process.exit(1)
             }
-            console.log(c_obj.values[c_obj.values.length - 1].message)
+            // If keeping only one commit, then assume the PR title supercedes
+            // the commit header and makes it pointless to include. Remove the
+            // first two lines (commit header and blank line). Not my problem
+            // if you don't follow proper git commit convention and this
+            // mangles your commit body.
+            let msg = c_obj.values[c_obj.values.length - 1].message
+            console.log(msg.split('\n').slice(2).join('\n'))
         }
         process_stdin(handler)
     } else if (args[3] === 'all') {
@@ -80,7 +91,7 @@ function process_stdin(cb) {
     let all_stdin = ''
     process.stdin.on('data', (dat) => {
         all_stdin += dat
-    });
+    })
 
     process.stdin.on('end', () => {
         try {
@@ -90,5 +101,5 @@ function process_stdin(cb) {
             console.error(`HTTP body:\n${all_stdin}`)
             process.exit(1)
         }
-    });
+    })
 }
