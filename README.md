@@ -157,7 +157,7 @@ Bitbucket squash merge message.
 
 - The truncation described above is particularly grievous
 - The default header prefix `Merged in <branch>` wastes characters and relies
-- on the branch name being a useful title.
+  on the branch name being a useful title.
 - The default header suffix `(pull request #X)` also wastes characters when it
   could be shortened without losing any meaning. The `PR #X` text correctly
   hyperlinks in the Bitbucket UI at the time of writing, so there's no reason
