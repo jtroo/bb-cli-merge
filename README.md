@@ -31,7 +31,7 @@ for me.
 
 # How to use
 
-```shell
+```sh
 # help
 ./bb-merge.sh -h
 
@@ -47,7 +47,7 @@ for me.
 This code relies on a [Bitbucket app password](https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/)
 to be able to read from Bitbucket and perform the merge. When first running the
 script, you will be prompted to input your Bitbucket username and app password.
-These will be encrypted and stored with `gpg` in `$PWD/.env.gpg`. Your
+These will be encrypted and stored with `gpg` in `$PWD/.bb-creds.gpg`. Your
 credentials are not sent anywhere other than to Bitbucket over https. Feel free
 to check the code, there's not that much of it.
 

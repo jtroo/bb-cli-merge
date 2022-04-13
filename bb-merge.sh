@@ -27,10 +27,10 @@ $0 --workspace my_workspace --repo my_repo --commits first --action merge 64
 Flags:
 
   -h | --help      : Print this message
-  -a | --action    : Action for this script. (dry-run|merge) (default: dry-run)
-  -c | --commits   : Commits to include in message (all|first) (default: all)
-  -r | --repo      : Bitbucket repository
   -w | --workspace : Bitbucket workspace
+  -r | --repo      : Bitbucket repository
+  -c | --commits   : Commits to include in message (all|first) (default: all)
+  -a | --action    : Action for this script. (dry-run|merge) (default: dry-run)
 "
 }
 
@@ -77,26 +77,25 @@ if [ "$ACTION" != dry-run ] && [ "$ACTION" != merge ]; then
 	exit 1
 fi
 
-# Ensure temporary .env file is removed
+# Ensure temporary .bb-creds file is removed
 function cleanup {
-	rm -f .env
+	rm -f .bb-creds
 }
 trap cleanup EXIT
 
 # Read in username and app pass if they exist. They should be stored as
-# `<var>=<value>` strings which are directly runnable, hence running gpg in a
-# freestanding $(...).
-$(2>/dev/null gpg -d .env.gpg)
+# `<var>=<value>` strings which are valid to evaluate.
+eval $(2>/dev/null gpg -d .bb-creds.gpg)
 
 if [ -z "$BB_APP_PW" ] || [ -z "$BB_USER" ]; then
-	echo "Input username (saved to .env.gpg file in current directory):"
+	echo "Input username (saved to .bb-creds.gpg file in current directory):"
 	read -p "> " BB_USER
-	echo "export BB_USER=$BB_USER" > .env
-	echo "Input app password (saved to .env.gpg file in current directory):"
+	echo "BB_USER=$BB_USER" > .bb-creds
+	echo "Input app password (saved to .bb-creds.gpg file in current directory):"
 	read -sp "(characters are hidden) > " BB_APP_PW
-	echo "export BB_APP_PW=$BB_APP_PW" >> .env
-	gpg -c .env
-	rm .env
+	echo "BB_APP_PW=$BB_APP_PW" >> .bb-creds
+	gpg -c .bb-creds
+	rm .bb-creds
 fi
 
 # Commands should not fail from here on.
@@ -142,16 +141,24 @@ echo -----
 echo
 
 # Double-quotes and newlines are escaped by sed and awk because the text is
-# sent as JSON. Strip carriage returns as well.
+# sent as JSON. Strip carriage returns as well, in case they exist.
+#
+# The awk `-vRS` sets the record separator to a regular expression meaning
+# "empty string". Since any non-empty string won't match the regular
+# expression, the record separator will never be found and the whole input
+# string will be treated as one record.
 commit_message=$(
 	echo -n "$msg" |
 		sed 's/"/\\\"/g' |
-		awk -vRS='\0' '{gsub(/\r/,"")}1' |
-		awk -vRS='\0' '{gsub(/\n/,"\\n")}1'
+		awk -vRS='^$' '{gsub(/\r/,"")}1' |
+		awk -vRS='^$' '{gsub(/\n/,"\\n")}1'
 )
 
 if [ "$ACTION" == dry-run ]; then
-	exit 1
+	echo
+	echo "Commit message as sent via curl:"
+	echo "$commit_message"
+	exit 0
 fi
 
 set +e
