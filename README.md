@@ -35,14 +35,17 @@ for me.
 # help
 ./bb-merge.sh -h
 
-# do a merge
+# print out desired commit message
 ./bb-merge.sh -w <workspace> -r <repo> [?-c (all|first)] <pr number>
+
+# do the merge
+./bb-merge.sh -w <workspace> -r <repo> -a merge [?-c (all|first)] <pr number>
 ```
 
 # Security
 
 This code relies on a [Bitbucket app password](https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/)
-to be able to read from Bitbucket and perform the merge. When running the
+to be able to read from Bitbucket and perform the merge. When first running the
 script, you will be prompted to input your Bitbucket username and app password.
 These will be encrypted and stored with `gpg` in `$PWD/.env.gpg`. Your
 credentials are not sent anywhere other than to Bitbucket over https. Feel free

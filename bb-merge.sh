@@ -5,20 +5,30 @@ REPO=
 PR_ID=
 BB_USER=
 COMMITS=all
+ACTION=dry-run
 
 function usage() {
-echo "
-Usage: $0 -w <workspace> -r <repo> [?-c (all|first)] <pr number>
+	echo "
+Usage:
+$0 \\
+	--workspace <workspace> \\
+	--repo <repo> \\
+	[?--action (dry-run|merge)] \\
+	[?--commits (all|first)] \\
+	<pr number>
 
-e.g.
+Examples:
 
-$0 -w my_workspace -r my_repo 64
-$0 -w my_workspace -r my_repo -c first 64
+$0 --workspace my_workspace --repo my_repo 64
+$0 --workspace my_workspace --repo my_repo --action merge 64
+$0 --workspace my_workspace --repo my_repo --commits first 64
+$0 --workspace my_workspace --repo my_repo --commits first --action merge 64
 
 Flags:
 
-  -c | --commits   : Commits to include in message (all|first) (default: all)
   -h | --help      : Print this message
+  -a | --action    : Action for this script. (dry-run|merge) (default: dry-run)
+  -c | --commits   : Commits to include in message (all|first) (default: all)
   -r | --repo      : Bitbucket repository
   -w | --workspace : Bitbucket workspace
 "
@@ -42,6 +52,10 @@ while [ ! $# -eq 0 ]; do
 			shift
 			COMMITS=$1
 			;;
+		-a | --action)
+			shift
+			ACTION=$1
+			;;
 		*)
 			PR_ID=$1
 			break
@@ -58,15 +72,19 @@ if [ "$COMMITS" != all ] && [ "$COMMITS" != first ]; then
 	usage
 	exit 1
 fi
+if [ "$ACTION" != dry-run ] && [ "$ACTION" != merge ]; then
+	usage
+	exit 1
+fi
 
 # Ensure temporary .env file is removed
 function cleanup {
-        rm -f .env
+	rm -f .env
 }
 trap cleanup EXIT
 
-# Read in username and app pass if they exist. The should be stored as `export
-# <var>=<value>` strings which are directly runnable, hence running gpg in a
+# Read in username and app pass if they exist. They should be stored as
+# `<var>=<value>` strings which are directly runnable, hence running gpg in a
 # freestanding $(...).
 $(2>/dev/null gpg -d .env.gpg)
 
@@ -116,21 +134,25 @@ body=$(echo "$commits" | ./bb-obj.js commits $COMMITS)
 #     body
 #     footer # footer includes a newline at the beginning if it exists
 #
-# Double-quotes and newlines are escaped by sed and awk because the text is
-# sent as JSON. Strips carriage returns.
 msg=$(printf "$title\n\n$body\n$footer")
-echo "Merging with message:"
+echo "Squash merge commit message:"
 echo -----
 echo "$msg"
 echo -----
 echo
 
+# Double-quotes and newlines are escaped by sed and awk because the text is
+# sent as JSON. Strip carriage returns as well.
 commit_message=$(
-	echo "$msg" |
+	echo -n "$msg" |
 		sed 's/"/\\\"/g' |
-		awk -vRS='\0' '{gsub(/\n/,"\\n")}1' |
-		awk -vRS='\0' '{gsub(/\r/,"")}1'
+		awk -vRS='\0' '{gsub(/\r/,"")}1' |
+		awk -vRS='\0' '{gsub(/\n/,"\\n")}1'
 )
+
+if [ "$ACTION" == dry-run ]; then
+	exit 1
+fi
 
 set +e
 ret=$(curl --request POST \
