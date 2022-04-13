@@ -129,16 +129,29 @@ opposed to the header of the commit message. The original commit header won't
 be the actual header after merging, so including the header of the first commit
 message is redundant and wasteful.
 
+This option exists because often I will have a meaningful and useful first
+commit, but then as part of the review process, add commits after creating the
+PR such as:
+
+```
+* Improve naming of function
+* Improve clarity of doc comment
+```
+
+These post-creation commits are useful to see during the review process, but
+are useless in the actual git history after merging to main. Using `-c first`,
+this code will only use the first, useful commit when merging to main.
+
 # My qualms
 
 If you're curious, below are more of my specific qualms about the default
 Bitbucket squash merge message.
 
 - The truncation described above is particularly grievous
-- The default header prefix `Merged in <branch>` wastes so many characters and
-  relies on the branch name being a useful title.
-- The default header suffix `(pull request #X)` also wastes so many characters when it
-  could be shortened to `(PR #X)` without losing any meaning. The `PR #X` text
-  correctly hyperlinks in the Bitbucket UI at the time of writing, so there's
-  no reason not to use `PR` instead of `pull request`.
+- The default header prefix `Merged in <branch>` wastes characters and relies
+- on the branch name being a useful title.
+- The default header suffix `(pull request #X)` also wastes characters when it
+  could be shortened without losing any meaning. The `PR #X` text correctly
+  hyperlinks in the Bitbucket UI at the time of writing, so there's no reason
+  not to use `PR` instead of `pull request`.
 - Redundant header when the PR is only one commit (see [body: first](#body-first))
