@@ -107,12 +107,11 @@ echo
 #
 # Double-quotes and newlines are escaped by sed and awk because the text is
 # sent as JSON. Strips carriage returns.
-msg="$title\n\n$body\n\n$footer"
 commit_message=$(
 	echo "$title\n\n$body\n$footer" |
-	sed 's/"/\\\"/g' |
-	awk -vRS=\0 '{gsub(/\n/,"\\n")}1' |
-	awk -vRS=\0 '{gsub(/\r/,"")}1'
+		sed 's/"/\\\"/g' |
+		awk -vRS=\0 '{gsub(/\n/,"\\n")}1' |
+		awk -vRS=\0 '{gsub(/\r/,"")}1'
 )
 
 set +e
