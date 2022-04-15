@@ -1,12 +1,5 @@
 #!/usr/bin/env bash
 
-WORKSPACE=
-REPO=
-PR_ID=
-BB_USER=
-COMMITS=all
-ACTION=dry-run
-
 function usage() {
 	echo "
 Usage:
@@ -33,6 +26,13 @@ Flags:
   -a | --action    : Action for this script. (dry-run|merge) (default: dry-run)
 "
 }
+
+WORKSPACE=
+REPO=
+PR_ID=
+BB_USER=
+COMMITS=all
+ACTION=dry-run
 
 while [ ! $# -eq 0 ]; do
 	case "$1" in
@@ -109,36 +109,68 @@ echo
 # obj.title
 # obj.participants[...].state === 'approved'
 # obj.participants[...].user.display_name
+fields="fields=participants.state,participants.user.display_name,id,title"
 pr=$(curl --request GET \
 	-u $BB_USER:$BB_APP_PW \
-	--url "https://api.bitbucket.org/2.0/repositories/$WORKSPACE/$REPO/pullrequests/$PR_ID" \
+	--url "https://api.bitbucket.org/2.0/repositories/$WORKSPACE/$REPO/pullrequests/$PR_ID?$fields" \
 	--header 'Accept: application/json')
 title=$(echo "$pr" | ./bb-obj.js pr title)
 footer=$(echo "$pr" | ./bb-obj.js pr approvers)
 
-echo
 echo "Getting commits"
 echo
-# # Care about:
-# # obj.values[...].message (order is increasing age or decreasing recency)
+# Care about:
+# obj.values[...].message (order is increasing age or decreasing recency)
+# obj.next (for pagination)
+fields="fields=values.message,next"
 commits=$(curl --request GET \
 	-u $BB_USER:$BB_APP_PW \
-	--url "https://api.bitbucket.org/2.0/repositories/$WORKSPACE/$REPO/pullrequests/$PR_ID/commits")
+	--url "https://api.bitbucket.org/2.0/repositories/$WORKSPACE/$REPO/pullrequests/$PR_ID/commits?$fields")
 body=$(echo "$commits" | ./bb-obj.js commits $COMMITS)
 
-# Format commit as:
-#
-#     title
-#     # blank line
-#     body
-#     footer # footer includes a newline at the beginning if it exists
-#
-msg=$(printf "$title\n\n$body\n$footer")
-echo "Squash merge commit message:"
-echo -----
-echo "$msg"
-echo -----
+# note: "next" can **only** match the JSON key; any "next" in a JSON value
+# (e.g. in a comment) will have the double-quotes escaped.
+while [ $(echo $commits | grep -c '"next"') -eq 1 ]; do
+	next_url=$(echo $commits | sed 's/.*"next": "\([^"]\+\).*/\1/')
+	commits=$(curl --request GET \
+			-u $BB_USER:$BB_APP_PW \
+			--url "$next_url")
+	if [ $COMMITS == all ]; then
+		body=$(printf "%s\n\n$body" "$(echo "$commits" | ./bb-obj.js commits $COMMITS)")
+	else
+		body=$(echo "$commits" | ./bb-obj.js commits $COMMITS)
+	fi
+done
+
+if [ -z "$body" ]; then
+	# body can be empty if $COMMITS is "first" and no body in commit; only header
+	#
+	# Format commit as:
+	#
+	#     title
+	#     footer # footer includes a newline at the beginning if it exists
+	msg=$(printf "$title\n$footer")
+else
+	# Format commit as:
+	#
+	#     title
+	#     # blank line
+	#     body
+	#     footer # footer includes a newline at the beginning if it exists
+	msg=$(printf "$title\n\n$body\n$footer")
+fi
 echo
+echo "Squashed commit message:"
+echo
+echo ------------------------------------------------------------------------
+echo "$msg"
+echo ------------------------------------------------------------------------
+echo
+
+# Exit early if doing a dry run.
+if [ "$ACTION" == dry-run ]; then
+	exit 0
+fi
 
 # Double-quotes and newlines are escaped by sed and awk because the text is
 # sent as JSON. Strip carriage returns as well, in case they exist.
@@ -154,17 +186,12 @@ commit_message=$(
 		awk -vRS='^$' '{gsub(/\n/,"\\n")}1'
 )
 
-if [ "$ACTION" == dry-run ]; then
-	echo
-	echo "Commit message as sent via curl:"
-	echo "$commit_message"
-	exit 0
-fi
-
+# Merge the PR
 set +e
+fields="fields=state,title"
 ret=$(curl --request POST \
 	-u $BB_USER:$BB_APP_PW \
-	--url "https://api.bitbucket.org/2.0/repositories/$WORKSPACE/$REPO/pullrequests/$PR_ID/merge" \
+	--url "https://api.bitbucket.org/2.0/repositories/$WORKSPACE/$REPO/pullrequests/$PR_ID/merge?$fields" \
 	--header 'Content-Type: application/json' \
 	-d "{
 		\"type\":\"squash\",
@@ -175,12 +202,6 @@ ret=$(curl --request POST \
 )
 
 echo
-if [ ${#ret} -lt 100 ]; then
-	echo $ret
-else
-	# This doen't actually check success, it just assumes that a long
-	# returned value is the large JSON that is returned when successful.
-	# I'm too lazy to figure out how to properly check for success, and
-	# this seems good enough for the script's intended use case.
-	echo "Success"
-fi
+echo Merge request returned:
+echo $ret
+echo

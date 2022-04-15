@@ -61,12 +61,16 @@ function handle_commits() {
                 console.error('No commits - PR likely already merged')
                 process.exit(1)
             }
+            let msg = c_obj.values[c_obj.values.length - 1].message
             // If keeping only one commit, then assume the PR title supercedes
             // the commit header and makes it pointless to include. Remove the
             // first two lines (commit header and blank line). Not my problem
             // if you don't follow proper git commit convention and this
             // mangles your commit body.
-            let msg = c_obj.values[c_obj.values.length - 1].message
+            //
+            // In the case that there is ONLY a header and no body in the first
+            // commit, this will output a blank line; this is fine. The PR
+            // title is the only useful info in that case.
             console.log(msg.split('\n').slice(2).join('\n'))
         }
         process_stdin(handler)
