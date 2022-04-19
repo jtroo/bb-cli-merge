@@ -136,7 +136,7 @@ while [ $(echo $commits | grep -c '"next"') -eq 1 ]; do
 			-u $BB_USER:$BB_APP_PW \
 			--url "$next_url")
 	if [ $COMMITS == all ]; then
-		body=$(printf "%s\n\n$body" "$(echo "$commits" | ./bb-obj.js commits $COMMITS)")
+		body=$(printf "%s\n\n%s" "$(echo "$commits" | ./bb-obj.js commits $COMMITS)" "$body")
 	else
 		body=$(echo "$commits" | ./bb-obj.js commits $COMMITS)
 	fi
@@ -149,7 +149,7 @@ if [ -z "$body" ]; then
 	#
 	#     title
 	#     footer # footer includes a newline at the beginning if it exists
-	msg=$(printf "$title\n$footer")
+	msg=$(printf "%s\n%s" "$title" "$footer")
 else
 	# Format commit as:
 	#
@@ -157,7 +157,12 @@ else
 	#     # blank line
 	#     body
 	#     footer # footer includes a newline at the beginning if it exists
-	msg=$(printf "$title\n\n$body\n$footer")
+	msg=$(printf "%s\n\n%s\n%s" "$title" "$body" "$footer")
+msg=$(echo \
+"$title
+
+$body
+$footer")
 fi
 echo
 echo "Squashed commit message:"
